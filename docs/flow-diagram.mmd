@@ -1,0 +1,34 @@
+%% Dynamic Email Router — Genesys Cloud inbound email flow
+%% Render: https://mermaid.live  or  `mmdc -i flow-diagram.mmd -o flow-diagram.svg`
+flowchart TD
+    IN([Inbound email to ANY address]) --> ROUTE[/"Inbound Email Route(s)<br/>Admin ▸ Routing ▸ Email<br/>catch-all domain → this flow"/]
+    ROUTE --> NORM["Initial State<br/>toAddress = ToLower(Trim(Email.Message.to0.id))<br/>domain = '@' + host part"]
+
+    NORM --> L1{{"Tier 1 — Data Table Lookup<br/>key = toAddress"}}
+    L1 -->|found| SET[Resolve queue / skills / priority<br/>language / auto-reply]
+    L1 -->|no match| L2{{"Tier 2 — Data Table Lookup<br/>key = @domain"}}
+    L2 -->|found| SET
+    L2 -->|no match| L3{{"Tier 3 — Data Table Lookup<br/>key = DEFAULT"}}
+    L3 -->|found| SET
+    L3 -->|no match| UNR
+
+    SET --> GATE{matched AND enabled?}
+    GATE -->|no| UNR["Unrouted (safety net)<br/>Transfer to Email Triage"]
+    GATE -->|yes| AR{autoReplyEnabled?}
+    AR -->|yes| SEND[Send Auto Reply<br/>Response Mgmt response]
+    AR -->|no| XFER
+    SEND --> XFER["Transfer to ACD<br/>FindQueue(queueName)<br/>skills • priority • language"]
+    XFER -->|success| AGENT([Queued to agent])
+    XFER -->|failure| UNR
+    UNR -->|failure| DISC([Disconnect])
+
+    DT[("Email Routing<br/>data table")] -. drives .- L1
+    DT -. drives .- L2
+    DT -. drives .- L3
+
+    classDef dt fill:#fde68a,stroke:#b45309,color:#000;
+    classDef safe fill:#fecaca,stroke:#b91c1c,color:#000;
+    classDef ok fill:#bbf7d0,stroke:#15803d,color:#000;
+    class DT dt;
+    class UNR,DISC safe;
+    class AGENT ok;

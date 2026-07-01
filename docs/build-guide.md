@@ -41,8 +41,9 @@ Add these flow variables:
 ## State 1 — Initial State
 
 1. **Update Data** — "Normalise Recipient":
-   - `Flow.toAddress` = `ToLower(Trim(Email.To.Email))`
-     *(If your org surfaces `Email.To` as a collection, use `Email.To[1].Email`.)*
+   - `Flow.toAddress` = `ToLower(Trim(Email.Message.to[0].id))`
+     *(`Email.Message.to[0].id` is the verified inbound-email built-in for the
+     first primary recipient — confirmed against Genesys's own email flow export.)*
    - `Flow.domain` =
      `If(Find(Flow.toAddress, "@") >= 0, Substring(Flow.toAddress, Find(Flow.toAddress, "@")), "@__nodomain__")`
 
@@ -74,8 +75,9 @@ Add these flow variables:
    - **No:** nothing.
 
 2. **Transfer to ACD** — "Transfer To Resolved Queue":
-   - Queue: `Flow.queueName`
+   - Queue: `FindQueue(Flow.queueName)`
    - Skills: `If(IsNotSetOrEmpty(Flow.skills), MakeList(), Split(Flow.skills, ","))`
+     with **Append Skills = true**
    - Language skill: `Flow.languageSkill`
    - Priority: `Flow.priority`
    - **Failure path:** Change state → **Unrouted**.

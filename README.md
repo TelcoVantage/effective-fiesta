@@ -30,7 +30,12 @@ anything-else    ─┘                                  └──────�
 
 | Path                                   | What it is                                            |
 |----------------------------------------|-------------------------------------------------------|
-| `flows/dynamic-email-router.yaml`      | The inbound email flow (Archy YAML).                  |
+| `flows/dynamic-email-router.yaml`      | The inbound email flow (Archy YAML) — full logic.     |
+| `flows/dynamic-email-router.i3InboundEmailFlow` | Native Architect import file (starter shell).|
+| `flows/dynamic-email-router.i3flow.json`| Decoded, human-readable native model.                |
+| `scripts/i3flow.py`                    | Codec for native `.i3*Flow` files (decode/encode/verify). |
+| `docs/architecture-diagram.svg` / `docs/flow-diagram.mmd` | Visual diagrams.                   |
+| `docs/native-i3-format.md`             | The reverse-engineered `.i3*Flow` format, explained.  |
 | `data-tables/email-routing.schema.json`| Data table schema (API create payload).               |
 | `data-tables/email-routing.sample.csv` | Starter routing rules.                                |
 | `terraform/`                           | CX-as-Code: data table + rows + flow publish.         |
@@ -83,11 +88,26 @@ Full walkthrough in [`docs/extending.md`](docs/extending.md).
 
 ## Notes & assumptions
 
-- Lookup key is the **lowercased** recipient (`Email.To.Email`). If your org
-  exposes `Email.To` as a collection, use `Email.To[1].Email` — called out in
-  `flows/dynamic-email-router.yaml` and `docs/build-guide.md`.
+- Lookup key is the **lowercased** recipient `Email.Message.to[0].id` — the
+  verified inbound-email built-in (confirmed against Genesys's own email flow
+  export), used in `flows/dynamic-email-router.yaml` and `docs/build-guide.md`.
 - Archy's YAML keys vary slightly by CLI version; if `archy validate` flags
   something, `docs/build-guide.md` is the source of truth (kept 1:1 with the YAML).
+
+## Two ways to import into Architect
+
+| Artifact | How to import | Carries |
+|----------|---------------|---------|
+| `flows/dynamic-email-router.yaml` | Architect UI **Save ▸ Import** (accepts `.yaml`), or `archy create` | **Full** data-table logic (recommended) |
+| `flows/dynamic-email-router.i3InboundEmailFlow` | Architect UI **Save ▸ Import** | Native-format **starter** shell (Initial State ▸ Transfer to ACD ▸ Disconnect) |
+
+The `.i3InboundEmailFlow` file is Architect's native export format, which this
+repo's `scripts/i3flow.py` codec proved to be `base64(urlencode(compiled-JSON))`
+— a compiler artifact whose expressions are stored as compiled ASTs. Because
+non-trivial expressions cannot be reliably hand-authored in that form, the full
+data-table routing lives in the **YAML** (also UI-importable); the native file is
+a verified, import-ready email-flow shell you can extend in Architect. See
+`docs/native-i3-format.md`.
 - Data tables suit single-row, key-based lookups (string key + up to ~9 columns).
   To exceed that, swap the in-flow lookups for a **Data Action** — the flow's
   three-tier logic is unchanged. See `docs/architecture.md`.

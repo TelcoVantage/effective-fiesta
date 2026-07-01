@@ -15,15 +15,20 @@
 #   archy validate --file flows/dynamic-email-router.yaml
 #   archy create   --file flows/dynamic-email-router.yaml
 #
-# NOTE: Archy's action schema shifts slightly between CLI versions. Treat this
-# file as the canonical structure/logic; if `archy validate` flags a key on
-# your installed version, the authoritative step-by-step build is in
-# docs/build-guide.md (the two are kept 1:1 in sync).
+# Verified against the official Genesys "Direct Routing Inbound Email Flow"
+# export: the recipient address is Email.Message.to[0].id, ACD transfer targets a
+# queue via FindQueue(...), and the flow carries startUpRef +
+# settingsInboundEmailHandling. The data-table lookup / decision actions below
+# follow Architect's Data Table Lookup action; because Archy's action schema is
+# only fully materialised via `archy refresh` against your org, run
+# `archy validate` after import. docs/build-guide.md is the authoritative,
+# UI-action-by-action build and is kept 1:1 with this file.
 # =============================================================================
 
 inboundEmail:
   name: Dynamic Email Router
   division: Home
+  startUpRef: "/inboundEmail/states/state[Initial State_10]"
   description: >-
     Data-table driven inbound email router. Queue, skills, priority, language
     and auto-reply are resolved at runtime from the 'Email Routing' data table,
@@ -33,6 +38,10 @@ inboundEmail:
     en-us:
       defaultLanguageSkill:
         noValue: true
+  settingsInboundEmailHandling:
+    emailHandling:
+      disconnect:
+        none: true
   settingsErrorHandling:
     errorHandling:
       disconnect:
@@ -87,12 +96,12 @@ inboundEmail:
           - updateData:
               name: Normalise Recipient
               statements:
-                # The address the customer emailed (single primary recipient).
-                # If your org exposes Email.To as a collection, use Email.To[1].Email.
+                # The address the customer emailed. Verified built-in for inbound
+                # email flows: Email.Message.to[0].id (first primary recipient).
                 - string:
                     variable: Flow.toAddress
                     value:
-                      exp: ToLower(Trim(Email.To.Email))
+                      exp: ToLower(Trim(Email.Message.to[0].id))
                 # Derive "@domain.com" from the address (everything from '@').
                 - string:
                     variable: Flow.domain
@@ -232,18 +241,21 @@ inboundEmail:
 
           - transferToAcd:
               name: Transfer To Resolved Queue
+              # Queue is resolved by NAME from the data table via FindQueue().
               targetQueue:
-                exp: Flow.queueName
+                exp: FindQueue(Flow.queueName)
               # Comma-separated skills from the data table are parsed to a list.
               skills:
                 exp: >-
                   If(IsNotSetOrEmpty(Flow.skills), MakeList(),
                      Split(Flow.skills, ","))
+              appendSkills:
+                lit: true
               languageSkill:
                 exp: Flow.languageSkill
               priority:
                 exp: Flow.priority
-              preTransferAudio: { none: true }
+              preferredAgents: { noValue: true }
               failureOutputs:
                 actions:
                   - switchToState:
@@ -262,10 +274,10 @@ inboundEmail:
           - transferToAcd:
               name: Safety Net Queue
               targetQueue:
-                # Change this to your real fallback/triage queue name.
-                exp: "Email Triage"
+                # Change "Email Triage" to your real fallback/triage queue name.
+                exp: FindQueue("Email Triage")
               priority:
-                exp: 0
+                lit: 0
               failureOutputs:
                 actions:
                   - disconnect:
