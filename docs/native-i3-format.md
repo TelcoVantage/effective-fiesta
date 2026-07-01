@@ -57,10 +57,19 @@ Therefore:
   Architect's UI **Save ▸ Import** accepts `.yaml`, and `archy create` compiles
   the expressions server-side. **This is the recommended import.**
 - **`flows/dynamic-email-router.i3InboundEmailFlow`** — a native-format,
-  import-ready **starter** (Initial State ▸ Transfer to ACD ▸ Disconnect),
-  produced by adapting Genesys's own verified email-flow export so all scaffolding
-  is schema-correct. Import it to get a native shell, then either layer the
-  data-table lookups per `docs/build-guide.md`, or just import the YAML instead.
+  import-ready **minimal shell**: a single Initial State with a Disconnect and
+  **zero external dependencies**, produced by stripping Genesys's own verified
+  email-flow export down to schema-correct scaffolding. Import it to get a native
+  shell in the correct format, then either layer the data-table lookups per
+  `docs/build-guide.md`, or (recommended) just import the YAML instead.
+
+  > Why only a Disconnect, not a Transfer? A compiled **Transfer to ACD** action
+  > carries version-sensitive in-queue-handling fields (`useDefaultHandling`,
+  > `inQueueFlowId`, …) whose exact valid representation depends on how Architect
+  > compiled it. Hand-editing those beyond a trivial shell risks a *“flow import
+  > failed / failed to load the flow”* error. Anything past the shell should be
+  > compiled by Architect/Archy from the **YAML**, not hand-authored in the
+  > native model.
 - **`flows/dynamic-email-router.i3flow.json`** — the decoded, human-readable
   model behind the native file; edit it and run `i3flow.py encode` to regenerate.
 

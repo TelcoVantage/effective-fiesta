@@ -99,15 +99,15 @@ Full walkthrough in [`docs/extending.md`](docs/extending.md).
 | Artifact | How to import | Carries |
 |----------|---------------|---------|
 | `flows/dynamic-email-router.yaml` | Architect UI **Save ▸ Import** (accepts `.yaml`), or `archy create` | **Full** data-table logic (recommended) |
-| `flows/dynamic-email-router.i3InboundEmailFlow` | Architect UI **Save ▸ Import** | Native-format **starter** shell (Initial State ▸ Transfer to ACD ▸ Disconnect) |
+| `flows/dynamic-email-router.i3InboundEmailFlow` | Architect UI **Save ▸ Import** | Native-format **minimal valid shell** (Initial State ▸ Disconnect) |
 
 The `.i3InboundEmailFlow` file is Architect's native export format, which this
 repo's `scripts/i3flow.py` codec proved to be `base64(urlencode(compiled-JSON))`
 — a compiler artifact whose expressions are stored as compiled ASTs. Because
 non-trivial expressions cannot be reliably hand-authored in that form, the full
 data-table routing lives in the **YAML** (also UI-importable); the native file is
-a verified, import-ready email-flow shell you can extend in Architect. See
-`docs/native-i3-format.md`.
+a minimal, import-ready email-flow shell (Initial State ▸ Disconnect, zero
+external dependencies) you extend in Architect. See `docs/native-i3-format.md`.
 - Data tables suit single-row, key-based lookups (string key + up to ~9 columns).
   To exceed that, swap the in-flow lookups for a **Data Action** — the flow's
   three-tier logic is unchanged. See `docs/architecture.md`.
