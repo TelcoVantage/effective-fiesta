@@ -1,0 +1,62 @@
+{
+  "name": "Email Routing",
+  "description": "Drives the 'Dynamic Email Router' inbound email flow. Each row maps an inbound recipient (exact address, an @domain fallback, or the DEFAULT sentinel) to its routing behaviour. Add a row to onboard a new mailbox - no flow change required.",
+  "schema": {
+    "type": "object",
+    "required": [
+      "key"
+    ],
+    "properties": {
+      "key": {
+        "title": "Email Address / Domain / DEFAULT",
+        "type": "string",
+        "$id": "/properties/key"
+      },
+      "queueName": {
+        "title": "Queue Name",
+        "type": "string",
+        "default": ""
+      },
+      "skills": {
+        "title": "ACD Skills (comma separated)",
+        "type": "string",
+        "default": ""
+      },
+      "priority": {
+        "title": "Interaction Priority",
+        "type": "integer",
+        "default": 0
+      },
+      "languageSkill": {
+        "title": "Language Skill",
+        "type": "string",
+        "default": ""
+      },
+      "autoReplyEnabled": {
+        "title": "Auto Reply Enabled",
+        "type": "boolean",
+        "default": false
+      },
+      "autoReplyResponseName": {
+        "title": "Auto Reply Response Name",
+        "type": "string",
+        "default": ""
+      },
+      "businessHoursGroup": {
+        "title": "Business Hours Group (optional)",
+        "type": "string",
+        "default": ""
+      },
+      "screenPopUrl": {
+        "title": "Screen Pop URL (optional)",
+        "type": "string",
+        "default": ""
+      },
+      "enabled": {
+        "title": "Enabled",
+        "type": "boolean",
+        "default": true
+      }
+    }
+  }
+}

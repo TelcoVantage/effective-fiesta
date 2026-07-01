@@ -1,0 +1,284 @@
+# =============================================================================
+# Dynamic Email Router  —  Genesys Cloud Inbound Email Flow (Archy YAML)
+# =============================================================================
+# A single, catch-all inbound email flow that resolves ALL of its routing
+# behaviour at runtime from the "Email Routing" data table. Onboarding a new
+# mailbox, domain, queue, skill set, priority, language or auto-reply is done
+# by adding/editing a DATA TABLE ROW — this flow is never edited or republished.
+#
+# Resolution order (most specific wins):
+#   1. Exact address     e.g.  support@acme.com
+#   2. Domain  fallback  e.g.  @acme.com
+#   3. DEFAULT sentinel  e.g.  DEFAULT   (safety net so nothing is ever dropped)
+#
+# Import / validate with the Archy CLI:
+#   archy validate --file flows/dynamic-email-router.yaml
+#   archy create   --file flows/dynamic-email-router.yaml
+#
+# Verified against the official Genesys "Direct Routing Inbound Email Flow"
+# export: the recipient address is Email.Message.to[0].id, ACD transfer targets a
+# queue via FindQueue(...), and the flow carries startUpRef +
+# settingsInboundEmailHandling. The data-table lookup / decision actions below
+# follow Architect's Data Table Lookup action; because Archy's action schema is
+# only fully materialised via `archy refresh` against your org, run
+# `archy validate` after import. docs/build-guide.md is the authoritative,
+# UI-action-by-action build and is kept 1:1 with this file.
+# =============================================================================
+
+inboundEmail:
+  name: Dynamic Email Router
+  division: Home
+  startUpRef: "/inboundEmail/states/state[Initial State_10]"
+  description: >-
+    Data-table driven inbound email router. Queue, skills, priority, language
+    and auto-reply are resolved at runtime from the 'Email Routing' data table,
+    so new addresses/domains are onboarded without editing or republishing.
+  defaultLanguage: en-us
+  supportedLanguages:
+    en-us:
+      defaultLanguageSkill:
+        noValue: true
+  settingsInboundEmailHandling:
+    emailHandling:
+      disconnect:
+        none: true
+  settingsErrorHandling:
+    errorHandling:
+      disconnect:
+        none: true
+
+  # ---------------------------------------------------------------------------
+  # Flow-scoped variables. Defaults double as the "no match" safety net.
+  # ---------------------------------------------------------------------------
+  variables:
+    - stringVariable:
+        name: Flow.toAddress
+        initialValue: { noValue: true }
+    - stringVariable:
+        name: Flow.domain
+        initialValue: { noValue: true }
+    - stringVariable:
+        name: Flow.lookupKey
+        initialValue: { noValue: true }
+    - booleanVariable:
+        name: Flow.matched
+        initialValue: { lit: false }
+    - stringVariable:
+        name: Flow.queueName
+        initialValue: { lit: "__UNROUTED__" }
+    - stringVariable:
+        name: Flow.skills
+        initialValue: { noValue: true }
+    - integerVariable:
+        name: Flow.priority
+        initialValue: { lit: 0 }
+    - stringVariable:
+        name: Flow.languageSkill
+        initialValue: { noValue: true }
+    - booleanVariable:
+        name: Flow.autoReplyEnabled
+        initialValue: { lit: false }
+    - stringVariable:
+        name: Flow.autoReplyResponseName
+        initialValue: { noValue: true }
+    - booleanVariable:
+        name: Flow.rowEnabled
+        initialValue: { lit: true }
+
+  states:
+    # =========================================================================
+    # STATE 1 — Initial State: normalise the recipient + derive the domain key
+    # =========================================================================
+    - state:
+        name: Initial State
+        refId: Initial State_10
+        actions:
+          - updateData:
+              name: Normalise Recipient
+              statements:
+                # The address the customer emailed. Verified built-in for inbound
+                # email flows: Email.Message.to[0].id (first primary recipient).
+                - string:
+                    variable: Flow.toAddress
+                    value:
+                      exp: ToLower(Trim(Email.Message.to[0].id))
+                # Derive "@domain.com" from the address (everything from '@').
+                - string:
+                    variable: Flow.domain
+                    value:
+                      exp: >-
+                        If(Find(Flow.toAddress, "@") >= 0,
+                           Substring(Flow.toAddress, Find(Flow.toAddress, "@")),
+                           "@__nodomain__")
+
+          # -------------------------------------------------------------------
+          # TIER 1 — exact-address lookup. Output defaults below are returned
+          # when the key is absent; we detect that via the __UNROUTED__ sentinel.
+          # -------------------------------------------------------------------
+          - getDataTableRow:
+              name: Lookup Exact Address
+              dataTable: { name: Email Routing }
+              lookupValue:
+                exp: Flow.toAddress
+              outputs:
+                queueName:             { var: Flow.queueName,             default: { lit: "__UNROUTED__" } }
+                skills:                { var: Flow.skills,                default: { noValue: true } }
+                priority:              { var: Flow.priority,              default: { lit: 0 } }
+                languageSkill:         { var: Flow.languageSkill,         default: { noValue: true } }
+                autoReplyEnabled:      { var: Flow.autoReplyEnabled,      default: { lit: false } }
+                autoReplyResponseName: { var: Flow.autoReplyResponseName, default: { noValue: true } }
+                enabled:               { var: Flow.rowEnabled,            default: { lit: true } }
+
+          - decision:
+              name: Matched Exact?
+              condition:
+                exp: Flow.queueName != "__UNROUTED__"
+              outputs:
+                yes:
+                  actions:
+                    - updateData:
+                        name: Mark Matched (exact)
+                        statements:
+                          - boolean: { variable: Flow.matched, value: { lit: true } }
+                no:
+                  actions:
+                    # -----------------------------------------------------------
+                    # TIER 2 — domain-level lookup (@acme.com).
+                    # -----------------------------------------------------------
+                    - getDataTableRow:
+                        name: Lookup Domain
+                        dataTable: { name: Email Routing }
+                        lookupValue:
+                          exp: Flow.domain
+                        outputs:
+                          queueName:             { var: Flow.queueName,             default: { lit: "__UNROUTED__" } }
+                          skills:                { var: Flow.skills,                default: { noValue: true } }
+                          priority:              { var: Flow.priority,              default: { lit: 0 } }
+                          languageSkill:         { var: Flow.languageSkill,         default: { noValue: true } }
+                          autoReplyEnabled:      { var: Flow.autoReplyEnabled,      default: { lit: false } }
+                          autoReplyResponseName: { var: Flow.autoReplyResponseName, default: { noValue: true } }
+                          enabled:               { var: Flow.rowEnabled,            default: { lit: true } }
+
+                    - decision:
+                        name: Matched Domain?
+                        condition:
+                          exp: Flow.queueName != "__UNROUTED__"
+                        outputs:
+                          yes:
+                            actions:
+                              - updateData:
+                                  name: Mark Matched (domain)
+                                  statements:
+                                    - boolean: { variable: Flow.matched, value: { lit: true } }
+                          no:
+                            actions:
+                              # -------------------------------------------------
+                              # TIER 3 — DEFAULT sentinel row (org-wide safety net)
+                              # -------------------------------------------------
+                              - getDataTableRow:
+                                  name: Lookup Default
+                                  dataTable: { name: Email Routing }
+                                  lookupValue:
+                                    exp: "DEFAULT"
+                                  outputs:
+                                    queueName:             { var: Flow.queueName,             default: { lit: "__UNROUTED__" } }
+                                    skills:                { var: Flow.skills,                default: { noValue: true } }
+                                    priority:              { var: Flow.priority,              default: { lit: 0 } }
+                                    languageSkill:         { var: Flow.languageSkill,         default: { noValue: true } }
+                                    autoReplyEnabled:      { var: Flow.autoReplyEnabled,      default: { lit: false } }
+                                    autoReplyResponseName: { var: Flow.autoReplyResponseName, default: { noValue: true } }
+                                    enabled:               { var: Flow.rowEnabled,            default: { lit: true } }
+                              - updateData:
+                                  name: Mark Matched (default)
+                                  statements:
+                                    - boolean:
+                                        variable: Flow.matched
+                                        value:
+                                          exp: Flow.queueName != "__UNROUTED__"
+
+          # -------------------------------------------------------------------
+          # ROUTE — only if we resolved a queue AND the row is enabled.
+          # -------------------------------------------------------------------
+          - decision:
+              name: Routable?
+              condition:
+                exp: Flow.matched == true and Flow.rowEnabled == true
+              outputs:
+                yes:
+                  actions:
+                    - switchToState:
+                        name: Go Route
+                        targetState: { refId: Route_20 }
+                no:
+                  actions:
+                    - switchToState:
+                        name: Go Unrouted
+                        targetState: { refId: Unrouted_30 }
+
+    # =========================================================================
+    # STATE 2 — Route: optional auto-reply, then transfer to ACD with the
+    # resolved queue / skills / priority / language.
+    # =========================================================================
+    - state:
+        name: Route
+        refId: Route_20
+        actions:
+          - decision:
+              name: Send Auto Reply?
+              condition:
+                exp: Flow.autoReplyEnabled == true and IsNotSetOrEmpty(Flow.autoReplyResponseName) == false
+              outputs:
+                yes:
+                  actions:
+                    - sendAutoReply:
+                        name: Auto Acknowledge
+                        # Looks up a Response Management response by name at runtime.
+                        cannedResponse:
+                          libraryName: { exp: "Email Routing Auto Replies" }
+                          responseName: { exp: Flow.autoReplyResponseName }
+                no:
+                  actions: []
+
+          - transferToAcd:
+              name: Transfer To Resolved Queue
+              # Queue is resolved by NAME from the data table via FindQueue().
+              targetQueue:
+                exp: FindQueue(Flow.queueName)
+              # Comma-separated skills from the data table are parsed to a list.
+              skills:
+                exp: >-
+                  If(IsNotSetOrEmpty(Flow.skills), MakeList(),
+                     Split(Flow.skills, ","))
+              appendSkills:
+                lit: true
+              languageSkill:
+                exp: Flow.languageSkill
+              priority:
+                exp: Flow.priority
+              preferredAgents: { noValue: true }
+              failureOutputs:
+                actions:
+                  - switchToState:
+                      name: Route Failed
+                      targetState: { refId: Unrouted_30 }
+
+    # =========================================================================
+    # STATE 3 — Unrouted: nothing matched, or the matched row is disabled, or
+    # the ACD transfer failed. Route to a hard-coded fallback queue so an email
+    # is NEVER silently lost, then disconnect handling falls through.
+    # =========================================================================
+    - state:
+        name: Unrouted
+        refId: Unrouted_30
+        actions:
+          - transferToAcd:
+              name: Safety Net Queue
+              targetQueue:
+                # Change "Email Triage" to your real fallback/triage queue name.
+                exp: FindQueue("Email Triage")
+              priority:
+                lit: 0
+              failureOutputs:
+                actions:
+                  - disconnect:
+                      name: Give Up

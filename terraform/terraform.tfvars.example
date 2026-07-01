@@ -1,0 +1,39 @@
+# Copy to terraform.tfvars and edit. Onboarding a new mailbox = add one block.
+# The map key is the lookup key the flow matches (address, @domain, or DEFAULT).
+
+email_routing_rows = {
+  "DEFAULT" = {
+    queueName             = "Email Triage"
+    autoReplyEnabled      = true
+    autoReplyResponseName = "Generic Acknowledgement"
+  }
+
+  "@acme.com" = {
+    queueName             = "Acme Customer Care"
+    priority              = 1
+    languageSkill         = "English - Written"
+    autoReplyEnabled      = true
+    autoReplyResponseName = "Acme Acknowledgement"
+    businessHoursGroup    = "Acme Hours"
+  }
+
+  "support@acme.com" = {
+    queueName             = "Acme Support"
+    skills                = "Tier1 Support"
+    priority              = 2
+    languageSkill         = "English - Written"
+    autoReplyEnabled      = true
+    autoReplyResponseName = "Support Acknowledgement"
+    businessHoursGroup    = "Acme Hours"
+  }
+
+  "billing@acme.com" = {
+    queueName             = "Acme Billing"
+    skills                = "Billing"
+    priority              = 3
+    languageSkill         = "English - Written"
+    autoReplyEnabled      = true
+    autoReplyResponseName = "Billing Acknowledgement"
+    businessHoursGroup    = "Acme Hours"
+  }
+}

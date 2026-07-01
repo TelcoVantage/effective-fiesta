@@ -1,0 +1,8 @@
+key,queueName,skills,priority,languageSkill,autoReplyEnabled,autoReplyResponseName,businessHoursGroup,screenPopUrl,enabled
+DEFAULT,Email Triage,,0,,true,Generic Acknowledgement,,,true
+@acme.com,Acme Customer Care,,1,English - Written,true,Acme Acknowledgement,Acme Hours,,true
+support@acme.com,Acme Support,Tier1 Support,2,English - Written,true,Support Acknowledgement,Acme Hours,https://crm.acme.com/lookup?email={{email}},true
+billing@acme.com,Acme Billing,Billing,3,English - Written,true,Billing Acknowledgement,Acme Hours,,true
+sales@acme.com,Acme Sales,Sales,5,English - Written,false,,Acme Hours,,true
+ventas@acme.com,Acme Sales,"Sales,Spanish",5,Spanish - Written,true,Ventas Acuse,Acme Hours,,true
+oldteam@acme.com,Email Triage,,0,,false,,,,false
